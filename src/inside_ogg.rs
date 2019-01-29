@@ -163,7 +163,7 @@ impl<T: Read + Seek> OggStreamReader<T> {
 	/// stream has been reached, or Some(packet_data),
 	/// with the data of the decompressed packet.
 	pub fn read_dec_packet(&mut self) ->
-			Result<Option<Vec<Vec<i16>>>, VorbisError> {
+			Result<Option<Vec<Vec<f32>>>, VorbisError> {
 		let pck = match try!(self.read_next_audio_packet()) {
 			Some(p) => p,
 			None => return Ok(None),
@@ -205,7 +205,7 @@ impl<T: Read + Seek> OggStreamReader<T> {
 	/// Unlike `read_dec_packet`, this function returns the
 	/// interleaved samples.
 	pub fn read_dec_packet_itl(&mut self) ->
-			Result<Option<Vec<i16>>, VorbisError> {
+			Result<Option<Vec<f32>>, VorbisError> {
 		let decoded_pck = match try!(self.read_dec_packet()) {
 			Some(p) => p,
 			None => return Ok(None),
@@ -385,7 +385,7 @@ pub mod async_api {
 	}
 
 	impl<T :AsyncRead> Stream for OggStreamReader<T> {
-		type Item = Vec<Vec<i16>>;
+		type Item = Vec<Vec<f32>>;
 		type Error = VorbisError;
 
 		fn poll(&mut self) -> Poll<Option<Vec<Vec<i16>>>, VorbisError> {

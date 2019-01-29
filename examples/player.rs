@@ -57,12 +57,12 @@ fn run() -> Result<(), VorbisError> {
 		println!("Decoded packet no {}, with {} samples.", n, pck_samples.len());
 		n += 1;
 		let buf = match srr.ident_hdr.audio_channels {
-			1 => cxt.new_buffer::<Mono<i16>,_>(&pck_samples, sample_rate),
-			2 => cxt.new_buffer::<Stereo<i16>,_>(&pck_samples, sample_rate),
+			1 => cxt.new_buffer::<Mono<f32>,_>(&pck_samples, sample_rate),
+			2 => cxt.new_buffer::<Stereo<f32>,_>(&pck_samples, sample_rate),
 			n => panic!("unsupported number of channels: {}", n),
 		}.unwrap();
 
-		str_src.queue_buffer(buf);
+		str_src.queue_buffer(buf).expect("alto error");
 
 		len_play += pck_samples.len() as f32 / sample_channels;
 		// If we are faster than realtime, we can already start playing now.

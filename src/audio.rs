@@ -904,7 +904,7 @@ Panics if the passed PreviousWindowRight struct doesn't match the info
 from the ident header.
 */
 pub fn read_audio_packet(ident :&IdentHeader, setup :&SetupHeader, packet :&[u8], pwr :&mut PreviousWindowRight)
-		-> Result<Vec<Vec<i16>>, AudioReadError> {
+		-> Result<Vec<Vec<f32>>, AudioReadError> {
 	let mut rdr = BitpackCursor::new(packet);
 	if try!(rdr.read_bit_flag()) {
 		try!(Err(AudioReadError::AudioIsHeader));
@@ -1140,23 +1140,23 @@ pub fn read_audio_packet(ident :&IdentHeader, setup :&SetupHeader, packet :&[u8]
 	}
 
 	pwr.data = Some(future_prev_halves);
+//
+//	// Generate final integer samples
+//	let final_i16_samples = audio_spectri.into_iter()
+//		.map(|samples| {
+//			samples.iter()
+//				.map(|s| {
+//					let s = s * 32768.0;
+//					if s > 32767. {
+//						32767
+//					} else if s < -32768. {
+//						-32768
+//					} else {
+//						s as i16
+//					}
+//				})
+//				.collect()
+//		}).collect();
 
-	// Generate final integer samples
-	let final_i16_samples = audio_spectri.into_iter()
-		.map(|samples| {
-			samples.iter()
-				.map(|s| {
-					let s = s * 32768.0;
-					if s > 32767. {
-						32767
-					} else if s < -32768. {
-						-32768
-					} else {
-						s as i16
-					}
-				})
-				.collect()
-		}).collect();
-
-	Ok(final_i16_samples)
+	Ok(audio_spectri.clone())
 }
