@@ -24,6 +24,16 @@ fn test_malformed_fuzzed() {
 
 	ensure_malformed!("27_really_minimized_testcase_crcfix.ogg", BadAudio(AudioBadFormat));
 	ensure_malformed!("32_minimized_crash_testcase.ogg", BadHeader(HeaderBadFormat));
+	ensure_malformed!("35_where_did_my_memory_go_repacked.ogg", BadHeader(HeaderBadFormat));
+
+	ensure_malformed!("bug-42-sample009.ogg", BadAudio(AudioBadFormat));
+	ensure_malformed!("bug-42-sample012.ogg", BadAudio(AudioBadFormat));
+	//ensure_malformed!("bug-42-sample015.ogg", BadAudio(AudioBadFormat));
+
+	ensure_malformed!("bug-44-sample059.ogg", BadHeader(HeaderBadFormat));
+	ensure_malformed!("bug-44-sample060.ogg", BadHeader(HeaderBadFormat));
+
+	ensure_malformed!("bug-46-sample001.ogg", BadAudio(AudioBadFormat));
 }
 
 #[test]
@@ -34,4 +44,6 @@ fn test_okay_fuzzed() {
 	println!();
 
 	ensure_okay!("33_minimized_panic_testcase.ogg");
+	ensure_okay!("bug-42-sample016.ogg");
+	ensure_okay!("bug-42-sample029.ogg");
 }
