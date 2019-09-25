@@ -17,8 +17,10 @@ use ogg::{PacketReader, Packet};
 use header::*;
 use VorbisError;
 use std::io::{Read, Seek};
-use ::audio::{PreviousWindowRight, read_audio_packet};
+use ::audio::{PreviousWindowRight, read_audio_packet,
+	read_audio_packet_generic};
 use ::header::HeaderSet;
+use ::samples::{Samples, InterleavedSamples};
 
 /// Reads the three vorbis headers from an ogg stream as well as stream serial information
 ///
@@ -81,7 +83,7 @@ impl<T: Read + Seek> OggStreamReader<T> {
 	/// I/O. In order to support this use case, enable the `async_ogg` feature,
 	/// and use the `HeadersReader` struct instead.
 	pub fn new(rdr :T) ->
-			Result<OggStreamReader<T>, VorbisError> {
+			Result<Self, VorbisError> {
 		OggStreamReader::from_ogg_reader(PacketReader::new(rdr))
 	}
 	/// Constructs a new OggStreamReader from a given Ogg PacketReader.
@@ -93,7 +95,7 @@ impl<T: Read + Seek> OggStreamReader<T> {
 	/// I/O. In order to support this use case, enable the `async_ogg` feature,
 	/// and use the `HeadersReader` struct instead.
 	pub fn from_ogg_reader(mut rdr :PacketReader<T>) ->
-			Result<OggStreamReader<T>, VorbisError> {
+			Result<Self, VorbisError> {
 		let ((ident_hdr, comment_hdr, setup_hdr), stream_serial) =
 			try!(read_headers(&mut rdr));
 		return Ok(OggStreamReader {
@@ -163,12 +165,24 @@ impl<T: Read + Seek> OggStreamReader<T> {
 	/// stream has been reached, or Some(packet_data),
 	/// with the data of the decompressed packet.
 	pub fn read_dec_packet(&mut self) ->
-			Result<Option<Vec<Vec<f32>>>, VorbisError> {
+			Result<Option<Vec<Vec<i16>>>, VorbisError> {
+		let pck = try!(self.read_dec_packet_generic());
+		Ok(pck)
+	}
+	/// Reads and decompresses an audio packet from the stream (generic).
+	///
+	/// On read errors, it returns Err(e) with the error.
+	///
+	/// On success, it either returns None, when the end of the
+	/// stream has been reached, or Some(packet_data),
+	/// with the data of the decompressed packet.
+	pub fn read_dec_packet_generic<S :Samples>(&mut self) ->
+			Result<Option<S>, VorbisError> {
 		let pck = match try!(self.read_next_audio_packet()) {
 			Some(p) => p,
 			None => return Ok(None),
 		};
-		let mut decoded_pck = try!(read_audio_packet(&self.ident_hdr,
+		let mut decoded_pck :S = try!(read_audio_packet_generic(&self.ident_hdr,
 			&self.setup_hdr, &pck.data, &mut self.pwr));
 
 		// If this is the last packet in the logical bitstream,
@@ -178,18 +192,12 @@ impl<T: Read + Seek> OggStreamReader<T> {
 		// of libvorbis.
 		if let (Some(absgp), true) = (self.cur_absgp, pck.last_in_stream()) {
 			let target_length = pck.absgp_page().saturating_sub(absgp) as usize;
-			for ch in decoded_pck.iter_mut() {
-				if target_length < ch.len() {
-					ch.truncate(target_length);
-				}
-			}
+			decoded_pck.truncate(target_length);
 		}
 		if pck.last_in_page() {
 			self.cur_absgp = Some(pck.absgp_page());
 		} else if let &mut Some(ref mut absgp) = &mut self.cur_absgp {
-			if let Some(v) = decoded_pck.get(0) {
-				*absgp += v.len() as u64;
-			}
+			*absgp += decoded_pck.num_samples() as u64;
 		}
 
 		return Ok(Some(decoded_pck));
@@ -205,32 +213,12 @@ impl<T: Read + Seek> OggStreamReader<T> {
 	/// Unlike `read_dec_packet`, this function returns the
 	/// interleaved samples.
 	pub fn read_dec_packet_itl(&mut self) ->
-			Result<Option<Vec<f32>>, VorbisError> {
-		let decoded_pck = match try!(self.read_dec_packet()) {
+			Result<Option<Vec<i16>>, VorbisError> {
+		let decoded_pck :InterleavedSamples<_> = match try!(self.read_dec_packet_generic()) {
 			Some(p) => p,
 			None => return Ok(None),
 		};
-		// Interleave
-		// TODO make int sample generation and
-		// interleaving one step.
-		let channel_count = decoded_pck.len();
-		// Note that a channel count of 0 is forbidden
-		// by the spec and the header decoding code already
-		// checks for that.
-		let samples_interleaved = if channel_count == 1 {
-			// Because decoded_pck[0] doesn't work...
-			decoded_pck.into_iter().next().unwrap()
-		} else {
-			let len = decoded_pck[0].len();
-			let mut samples = Vec::with_capacity(len * channel_count);
-			for i in 0 .. len {
-				for ref chan in decoded_pck.iter() {
-					samples.push(chan[i]);
-				}
-			}
-			samples
-		};
-		return Ok(Some(samples_interleaved));
+		return Ok(Some(decoded_pck.samples));
 	}
 
 	/// Returns the stream serial of the current stream
